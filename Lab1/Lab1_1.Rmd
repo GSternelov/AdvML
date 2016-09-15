@@ -163,7 +163,7 @@ querygrain(ltFit_grain2)[1]
 ```
 
 ## iii)
-To test whether the approximate method returns different results if the same query is repeated several times, the case investigated in *i)* is repeated four more times. The results are presented below and the obtained results do differ. This is because...  
+To test whether the approximate method returns different results if the same query is repeated several times, the case investigated in *i)* is repeated four more times. The results are presented below and the obtained results do differ. This is because the function that uses the approximate method, *cpdist*, is based on Monte Carlo particle filters. The effect of this is that the results returned by the function may be slightly different when the same query is executed several times. 
 
 ```{r, echo=FALSE}
 # Approximate method for several different seeds
@@ -248,8 +248,12 @@ To summarize these tests it can be conluded that it does not seem to be any clea
 
 Depending on what settings that are chosen the number of unique essential graphs differ. The lowest number of different EGs was 1357 and the highest 7483. However, in each of the tests the case is that the same EGs represent several different DAGs which makes the structure learning part a bit problematic. 
 
-When you choose what seems to be the most appropriate EG, there is a risk that what actually is the best DAG is missed or that since all these potential DAGs have the same score, the wrong one may be picked. 
-The problem with bayesian networks and the causal links between the nodes is that they are hard to find since several different DAGs have the same independencies, the same EG, 
+When you choose what seems to be the most appropriate EG, there is a risk that what actually is the best DAG is missed or that since all these potential DAGs have the same score, the wrong one may be picked. On the other hand, the number of potential DAGs is very high so it is not an realistic option to generate and compare all different DAGs. Hence, one problem with bayesian networks and the causal links between the nodes is that they are hard to find since several different DAGs have the same independencies, the same EG. 
 
+
+\pagebreak  
+
+# R code
+```{r code=readLines(knitr::purl("C:\\Users\\Gustav\\Documents\\AdvML\\Lab1\\Lab1_1.Rmd",documentation = 1)), eval = FALSE, tidy=TRUE}
 
 

@@ -1,7 +1,7 @@
 ---
-title: "Lab2"
+title: "Lab 2 - Advanced Machine Learning"
 author: "Gustav Sternelöv"
-date: "15 september 2016"
+date: "September 20, 2016"
 output: pdf_document
 ---
 
@@ -70,15 +70,15 @@ plot(plots1)
 ```
 
 
-All the distributions seem to be rather similar. The general pattern is the same in the plots for each distribution. To compare the respective distributions may be easier when all the distributions are in the same plot. 
+All the distributions seem to be rather similar as the general pattern is the same in the plots for each distribution. To compare the respective distributions may be easier when all the distributions are in the same plot. 
 ```{r, echo=FALSE, fig.width=7, fig.height=3.5}
 filter$distribution <- "Filtered"
 smooth$distribution <- "Smoothed"
 path$distribution <- "Path"
 allDist <- rbind(filter, smooth, path)
-ggplot(allDist, aes(x=obs, y=state, col=distribution)) + geom_path(size=1) + labs(x="Path", y="State", title="Comparsion of the distributions") + scale_y_continuous(breaks=c(1:10)) + theme_minimal()
+ggplot(allDist, aes(x=obs, y=state, col=distribution)) + geom_path() + labs(x="Path", y="State", title="Comparsion of the distributions") + scale_y_continuous(breaks=c(1:10)) + theme_minimal()
 ```
-It is notable that the line for the most probable path seem to get stuck at state 1 for relatively large periods. The filtered and the smoothed distribution appears to be rather similar for this set of 100 simulated time steps. 
+It is notable that the line for the most probable path seem to get stuck at state 1 for relatively large periods. The filtered and the smoothed distribution appears to be rather similar for this set of 100 simulated time steps. Althoguh, there is one notable difference between the two distributions. At four time steps the filtered distribution moves backwards, something that not is possible according to the specified scenario for the model. This does not occur at any time point for the smoothed distribution.  
 
 
 # (4) Compute the accuracy of the filtered and smoothed probability distributions, and of the most probable path. That is, compute the percentage of the true hidden states that are guessed by each method.
@@ -100,11 +100,13 @@ data.frame(Filtered=prop.table(table(filter$state))[1:10],Smoothed=prop.table(ta
 
 # (5) Repeat the previous exercise with different simulated samples. In general, the smoothed distributions should be more accurate than the filtered distributions. Why ? In general, the smoothed distributions should be more accurate than the most probable path, too. Why ?
 
+The accuracy is computed for samples of 50 to 350 by steps of 50 and the results are presented in the plot below.  
+
 ```{r, echo=FALSE, fig.width=6, fig.height=3.5}
 # 5
 ## Repeat the code above but with different sample sizes
-accuracy <- data.frame(sampleS=seq(50,350,5), accF=0, accS=0, accP=0)
-set.seed(311015)
+accuracy <- data.frame(sampleS=seq(50,350,10), accF=0, accS=0, accP=0)
+set.seed(0814)
 for(t in 1:nrow(accuracy)){
   Sim2 <- simHMM(HMM1, accuracy[t,1])
   # Filtering
@@ -132,36 +134,46 @@ for(t in 1:nrow(accuracy)){
 }
 accuracy2 <- tidyr::gather(accuracy, "method", "accuracy", 2:4)
 ggplot(accuracy2, aes(x=sampleS, y=accuracy, col=method)) + geom_line() + theme_minimal() +
-  scale_y_continuous(labels=percent)
-```
+  scale_y_continuous(labels=percent) + scale_x_continuous(breaks=seq(50,350,50))
+```  
 
+The blue line is the accuracy for the smoothed distribution and it can be seen that this distribution has the highest accuracy for all samples. The filtered distribution, red line, and most probable path, green line, has a relatively similar accuracy for most of the samples.  
+In general the smoothed distribution should be more accurate than the filtered since the former uses more data when it simulates the observation. More exactly, it makes use of both the forward and the backward step in the forward-backward algorithm whilst the filtered distribution only is a result of the forward step. 
+
+The smoothed distribution should also in the general case be more accurate than the most probable path. This is also a logical result since the aim with the viterbi algorithm which returns the most probable path is to return the path with the highest probability. A result of this aim is that the individually most probable state at each time step not always is chosen with the viterbi algorithm. The forward-backward algorithm on the other hand is constructed so that it at each time step choses the most probable state, but this may lead to paths with very low probability. Therefore, the smoothed distribution in general is more accurate than the most probable path. 
 
 # (6) Is it true that the more observations you have the better you know where the robot is?
+
+The entropy for samples of size 20 to 350 by steps of 10 for the filtered distribution is plotted.  
 
 ```{r, echo=FALSE, fig.width=6, fig.height=3.5, message=FALSE, warning=FALSE}
 # 6
 library(entropy)
-entrF <- data.frame(sampleS=seq(50,350,5), entropy=0)
+entrF <- data.frame(sampleS=seq(20,350,10), entropy=0)
 set.seed(311015)
 for(t in 1:nrow(entrF)){
-  Sim3 <- simHMM(HMM1, accuracy[t,1])
+  Sim3 <- simHMM(HMM1, entrF[t,1])
   # Filtering
   alpha <- exp(forward(HMM1, Sim3[[2]]))
-  filtering <- matrix(0, ncol=accuracy[t,1], nrow=10)
-  for(k in 1:accuracy[t,1]){
+  filtering <- matrix(0, ncol=entrF[t,1], nrow=10)
+  for(k in 1:entrF[t,1]){
     filtering[,k] <- alpha[,k] / colSums(alpha)[k]
   }  
-  filter <- data.frame(state=0, obs=1:accuracy[t,1])
-  for(l in 1:accuracy[t,1]){
+  filter <- data.frame(state=0, obs=1:entrF[t,1])
+  for(l in 1:entrF[t,1]){
     filter[l,1] <- which.max(filtering[,l])
   }
   entrF[t,2] <- entropy.empirical(table(filter$state))
 }
-ggplot(entrF, aes(x=sampleS, y=entropy)) + geom_line() + theme_minimal()
+ggplot(entrF, aes(x=sampleS, y=entropy)) + geom_line() + theme_minimal()+ scale_x_continuous(breaks=seq(0,350,50))
 ```
-
+As the sample size increases the entropy increases as well. This result indicates that we not do know better where the roboit is as the number of observations increases. When the sample size grows from 25 to 50 a relatively large increase for the entropy is returned and after that it keeps growing for sample sizes up to 100 before it settles a bit. The explanation to this lies in the fact that for the filtered distribution we can at a specific time step be quite sure where the robot is. However, it does not necessarily helps us very much to be sure about this time point when we try to discover where it is at the next time point. 
 
 # (7) Consider any of the samples above of length 100. Compute the probabilities of the hidden states for the time step 101.
+
+The probabilities of the hidden states for time step 101 are obtained by calculating the following probabilities. 
+$$p(Z^{101}|X^{0:100}) = \sum\limits_{Z^{100}} p(Z^{101}, Z^{100} | X^{0:100})$$
+$$p(Z^{101}|Z^{100}, X^{0:100}) p(Z^{100}|X^{0:100}) = p(Z^{101}|Z^{100}) p(Z^{100}|X^{0:100})$$
 
 $Z^{100}$ is simulated to be 7, so in the transition matrix is the probability for state 7 and 8 set to 0.5 and for the rest of the states is the probability 0. This tranisition matrix is multiplicated with the 100th row of the filtering matrix and normalized so that the sum of the probabilties is equal to 1. The result of these computations are presented in the table below and it can be noted that the probability for $Z^{101}$ to be in state 7 is 0.4 and the probability to be in state 8 is 0.6.
 ```{r, echo=FALSE}
@@ -170,4 +182,9 @@ Alph <- matrix(filtering1[,100])
 
 TP * Alph / sum(TP * Alph )
 ```
+
+
+# R code
+```{r code=readLines(knitr::purl("C:\\Users\\Gustav\\Documents\\AdvML\\Lab2\\Lab2.Rmd",documentation = 1)), eval = FALSE, tidy=TRUE}
+
 

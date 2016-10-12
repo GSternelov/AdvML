@@ -28,6 +28,9 @@ Sim1 <- simHMM(HMM1, 100)
 # Filtered prob dist
 options(scipen=99)
 alpha <- exp(forward(HMM1, Sim1$observation))
+alpha <- prop.table(alpha)
+alpha[,1:10]
+class(alpha)
 filtering1 <- matrix(0, ncol=100, nrow=10)
 for(k in 1:100){
   filtering1[,k] <- alpha[,k] / colSums(alpha)[k]
@@ -120,7 +123,15 @@ for(t in 1:nrow(entrF)){
   }
   entrF[t,2] <- entropy.empirical(table(filter$state))
 }
+entrop <- data.frame(entrop = 0)
+for(i in 1:100){
+  entrop[i,] <- entropy.empirical(filtering1[,i])
+}
+ggplot(entrop, aes(x=1:100, y=entrop)) + geom_line() + theme_classic() + labs(x="time step",
+            y="Entropy", title="Entropy for time step 1:100")
+
 ggplot(entrF, aes(x=sampleS, y=entropy)) + geom_line() + theme_minimal()+ scale_x_continuous(breaks=seq(0,350,50))
+
 
 ## ---- echo=FALSE---------------------------------------------------------
 TP <- matrix(c(0,0,0,0,0,0,0.5,0.5,0,0),ncol=1)

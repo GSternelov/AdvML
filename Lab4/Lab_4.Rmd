@@ -1,0 +1,138 @@
+---
+title: "Lab 4"
+author: "Gustav Sternelöv"
+date: "October 11, 2016"
+output: pdf_document
+---
+
+# Assignment 1
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+library(dlm)
+```
+
+
+## a) - Simulate the model
+
+```{r, echo=FALSE, fig.height=4, fig.width=7}
+# Assignment 1
+
+# a) - Simulate the model
+ssm1 <- function(C=matrix(0), A=matrix(1), B=matrix(0), u=matrix(0), x0=0,
+                 omegaE=0, omegaV=0, TimeS=0) {
+  xt <- 0
+  yt <- 0
+  vt <- rnorm(1, 0, omegaV)
+  xt[1] <- A%*%x0 + vt
+  et <- rnorm(1, 0, omegaE)
+  yt[1] <- C%*%xt + B%*%u + et
+  for(i in 2:TimeS){
+    vt <- rnorm(1, 0, omegaV)
+    xt[i] <- A%*%xt[i-1] + vt
+    et <- rnorm(1, 0, omegaE)
+    yt[i] <- C%*%xt[i]+ B%*%u + et
+  }
+  res <- data.frame(Val=c(xt,yt), t= rep(1:TimeS,2), 
+                    Value=rep(c("State","Observation"), each=TimeS))
+  return(res)
+}
+set.seed(1234)
+resA <- ssm1(C = matrix(0.93), x0 = 0, omegaE = sqrt(0.5), omegaV = sqrt(0.1), TimeS = 100)
+plotA <- ggplot(resA, aes(x=t, y=Val, col=Value)) + geom_line(size=1) + theme_classic() + 
+  ylim(-4,4) + scale_color_manual(values=c("skyblue", "royalblue"))
+plotA
+```
+
+
+## b) - Filtering: Sequential state inference
+
+```{r, echo=FALSE, fig.height=4, fig.width=7, message=FALSE, warning=FALSE}
+KalmanF <- function(yt, C=matrix(0), A=matrix(1),
+                    B=matrix(0), u=matrix(0), omegaE=0, omegaV=0, TimeS=0){
+  KalmanMat <- matrix(c(0,0), ncol=2, nrow=101)
+  for(i in 1:TimeS){
+    # Prediction update
+    muBar_t <- A %*%  KalmanMat[i,1] + B%*%u
+    sigmaBar_t <- A%*%KalmanMat[i,2]%*%t(A) + omegaV
+    # Measurement update
+    K_t <- sigmaBar_t%*%t(C) %*% solve(C%*%sigmaBar_t%*%t(C) + omegaE)
+    KalmanMat[i+1,1] <- muBar_t + K_t %*% (yt[i] - C%*%muBar_t)
+    KalmanMat[i+1,2] <- (diag(ncol(K_t))-K_t%*%C) %*% sigmaBar_t
+  }
+  KalmanFrame <- data.frame(KalmanMat[-1, ], Time=1:TimeS)
+  return(KalmanFrame)
+}
+
+resB <- KalmanF(yt = resA[101:200,1], C = matrix(0.93), omegaE = 0.5, omegaV = 0.1, TimeS=100)
+resB_1 <- data.frame(Val=c(resB[,1],resB[,1]+1.96*sqrt(resB[,2]),resB[,1]-1.96*sqrt(resB[,2])), Time=rep(1:100, 3), Value=rep(c("Kalman mean", "Upper", "Lower"), each=100))
+                     
+plotA + geom_line(data=resB_1, aes(x=Time, y=Val, col=Value), size=1) +ylim(-5,4)+
+  scale_colour_manual(values=c("red3", "darkorange","skyblue","royalblue","darkorange"))+
+  labs(x="Time", title="Kalman filter estimates with \n0.95 probability intervals")
+```
+
+
+```{r, echo=FALSE, fig.height=4, fig.width=7}
+filteringB <- dlmFilter(y=resA[101:200,1], dlm(m0=0, V=0.5, W=0.1, C0=10, FF=0.93, GG=1) )
+
+filterB <- data.frame(y=(filteringB$m)[-1])
+filterVar <- unlist(dlmSvd2var(u = filteringB$U.C, d = filteringB$D.C))
+filterB[101:300,1] <- c(filterB$y + 1.96*sqrt(filterVar[-1]), 
+                        filterB$y - 1.96*sqrt(filterVar[-1]))
+filterB$Time <- rep(1:100, 3)
+filterB$Value <- rep(c("dlm Kalman mean", "dlm Upper", "dlm Lower"), each=100)
+
+ggplot(resB_1, aes(x=Time, y=Val, col=Value,linetype=Value)) + geom_line(size=1) + theme_classic()+ ylim(-5,4)+ geom_line(data=filterB, aes(x=Time, y=y, col=Value, linetype=Value),size=1) +scale_colour_manual(values=c("purple","seagreen","seagreen","red3","darkorange","darkorange"))+scale_linetype_manual(values=c("dashed","dashed","dashed","solid","solid","solid"))+labs(title="Comparsion between dlmFilter and KalmanF function")
+```
+
+
+## c) - Prediction of state and data by simulation
+
+
+```{r, echo=FALSE, fig.height=4, fig.width=7}
+PredFunc <- function(C=matrix(0), A=matrix(1), B=matrix(0), u=matrix(0), x0=0,
+                     omegaE=0, omegaV=0, TimeS=0){
+  xt <- 0
+  yt <- 0
+  vt <- rnorm(1, 0, omegaV)
+  xt[1] <- x0 + vt
+  et <- rnorm(1, 0, omegaE)
+  yt[1] <- C%*%xt + B%*%u + et
+  for(i in 2:TimeS){
+    vt <- rnorm(1, 0, omegaV)
+    xt[i] <- A%*%xt[i-1] + vt
+    et <- rnorm(1, 0, omegaE)
+    yt[i] <- C%*%xt[i]+ B%*%u + et
+  }
+  res <- data.frame(x=c(xt, y=yt))
+  return(res)
+}
+
+PredC <- as.data.frame(matrix(nrow=10,ncol=10000))
+for(i in 1:10000){
+  PredC[,i] <- PredFunc(C = matrix(0.93), x0 = rnorm(1, mean=resB$X1[100], 
+                        sd=sqrt(resB$X2[100])),omegaE = sqrt(0.5), omegaV = sqrt(0.1),
+                        TimeS = 5)
+}
+quanTs <- t(apply(PredC, 1, quantile, probs=c(0.025, 0.975)))
+quanTsFrame <- data.frame(x=c(quanTs[,1], quanTs[,2]), Time= 100+rep(1:5, 4),
+                 Var=rep(c("x", "y"), 2,each=5), InterV=rep(c("Lower", "Upper"), each=10))
+quanTsFrame$Interval <- interaction(quanTsFrame$Var, quanTsFrame$InterV)
+quanTsFrame$Interval<- factor(quanTsFrame$Interval, levels=rev(levels(quanTsFrame$Interval)))
+
+ggplot(resA[1:100,], aes(y=Val, x=t)) + geom_line() + theme_classic() + ylim(-5,4) +
+  geom_line(data=resB_1[1:100,], aes(x=Time, y=Val), col="seagreen", size=1.1) +
+  geom_line(data=resB_1[101:200,], aes(x=Time, y=Val), col="darkorange", size=1) +
+  geom_line(data=resB_1[201:300,], aes(x=Time, y=Val), col="darkorange", size=1) +
+  geom_line(data=quanTsFrame, aes(x=Time, y=x, col=Interval), size=1) +
+  scale_color_manual(values=c("royalblue","red3","royalblue", "red3"))+
+  labs(x="Time", title="0.95 probability intervals for k=5")
+```
+
+
+
+
+
+
+

@@ -15,7 +15,7 @@ library(dlm)
 
 ## a) - Simulate the model
 
-```{r, echo=FALSE, fig.height=4, fig.width=7}
+```{r, echo=FALSE, fig.height=3, fig.width=7}
 # Assignment 1
 
 # a) - Simulate the model
@@ -47,7 +47,7 @@ plotA
 
 ## b) - Filtering: Sequential state inference
 
-```{r, echo=FALSE, fig.height=4, fig.width=7, message=FALSE, warning=FALSE}
+```{r, echo=FALSE, fig.height=3, fig.width=7, message=FALSE, warning=FALSE}
 KalmanF <- function(yt, C=matrix(0), A=matrix(1),
                     B=matrix(0), u=matrix(0), omegaE=0, omegaV=0, TimeS=0){
   KalmanMat <- matrix(c(0,0), ncol=2, nrow=101)
@@ -73,7 +73,7 @@ plotA + geom_line(data=resB_1, aes(x=Time, y=Val, col=Value), size=1) +ylim(-5,4
 ```
 
 
-```{r, echo=FALSE, fig.height=4, fig.width=7}
+```{r, echo=FALSE, fig.height=3, fig.width=7}
 filteringB <- dlmFilter(y=resA[101:200,1], dlm(m0=0, V=0.5, W=0.1, C0=10, FF=0.93, GG=1) )
 
 filterB <- data.frame(y=(filteringB$m)[-1])
@@ -90,7 +90,7 @@ ggplot(resB_1, aes(x=Time, y=Val, col=Value,linetype=Value)) + geom_line(size=1)
 ## c) - Prediction of state and data by simulation
 
 
-```{r, echo=FALSE, fig.height=4, fig.width=7}
+```{r, echo=FALSE, fig.height=3, fig.width=7}
 PredFunc <- function(C=matrix(0), A=matrix(1), B=matrix(0), u=matrix(0), x0=0,
                      omegaE=0, omegaV=0, TimeS=0){
   xt <- 0
@@ -132,6 +132,58 @@ ggplot(resA[1:100,], aes(y=Val, x=t)) + geom_line() + theme_classic() + ylim(-5,
 
 
 
+
+# Assignment 2
+
+
+## a) - Estimating the variance components by MLE.
+
+```{r, echo=FALSE}
+#rm(list=ls())
+# Assignment 2
+load("C:\\Users\\Gustav\\Documents\\AdvML\\Lab4\\CAPM.Rda")
+# a) - Estimating the variance components by MLE
+CAPMv <- CAPM_data[,c(10,17,18)]
+Zt <- matrix(CAPM_data$MARKET - CAPM_data$RKFREE)
+buildLocalTrend <- function(x,data){
+  V = exp(x[1])
+  W = diag(exp(x[2:3]),2,2)
+  return(dlm(
+    m0 = c(0,1),
+    C0 = diag(c(100,0.5),2),
+    FF = matrix(c(1,1),1,2),     
+    GG = diag(2),
+    JFF = matrix(c(0,1),1,2),
+    V = V,
+    W = W,
+    X=data))
+}
+
+initVal <- c(1,1,1) # Initial values for optim on the estimated parameters 
+#dlmLocalTrend <- buildLocalTrend(initVal, data = Zt) # Just to see that the build function works
+set.seed(311015)
+MLEs <- dlmMLE(as.matrix(CAPMv), parm = initVal, build = buildLocalTrend, data = Zt)
+dlmWithMLEs <- buildLocalTrend(MLEs$par, data = Zt)
+
+```
+
+$\sigma_\epsilon^2$ = $`r dlmWithMLEs[4]`$
+
+$\sigma_{v^{(1)}}^2$ = $`r data.frame((dlmWithMLEs[6]))[1,1]`$
+$\sigma_{v^{(2)}}^2$ = $`r data.frame((dlmWithMLEs[6]))[2,2]`$
+
+Should these by exp()?
+
+
+## b) - Filtering and smoothing
+
+
+
+## c) - Average sensitivity pre and post 1982 - a retrospective analysis
+
+
+
+## d) - Bayesian inference for the variance components
 
 
 

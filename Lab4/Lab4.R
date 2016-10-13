@@ -1,6 +1,7 @@
 library(ggplot2)
 library(scales)
 library(dlm)
+library(gridExtra)
 
 # Assignment 1
 
@@ -177,21 +178,71 @@ dlmLocalTrend <- buildLocalTrend(initVal, data = Zt) # Just to see that the buil
 MLEs <- dlmMLE(as.matrix(CAPMv), parm = initVal, build = buildLocalTrend, data = Zt)
 dlmWithMLEs <- buildLocalTrend(MLEs$par, data = Zt)
 
-Filter <- dlmFilter(y = as.matrix(CAPMv$IBM), dlmWithMLEs)
-Filter_y <- data.frame(Filter$m)
-plot(Filter_y[-1,1], type="l", ylim = c(0,1))
-lines(Filter_y[-1,2])
+# b) - Filtering and smoothing
+## Filtering ##
+Filter_2b <- dlmFilter(y = as.matrix(CAPMv$IBM), dlmWithMLEs)
+
+# Variances, which value is of interest for which variable??
+u1 <- matrix((t(data.frame(Filter_2b$U.C)))[c(seq(1,242,2)),1])
+u2 <- matrix((t(data.frame(Filter_2b$U.C)))[c(seq(2,242,2)),2])
+u_1 <-list()
+u_2 <- list()
+for(i in 1:120){
+  u_1[i]<-c(u1[i+1])
+  u_2[i]<-c(u2[i+1])
+}
+Filter_y <- data.frame(alpha=c(Filter_2b$m)[2:121],beta=c(Filter_2b$m)[123:242])
+Filter_y$alphaVar <- unlist(dlmSvd2var(u = u_1, d = matrix(Filter_2b$D.C[-1,1])))
+Filter_y$betaVar <- unlist(dlmSvd2var(u = u_2, d = matrix(Filter_2b$D.C[-1,2])))
+# Intervals
+Filter_y$alphaLower <- Filter_y$alpha - 1.96*sqrt(Filter_y$alphaVar)
+Filter_y$alphaUpper <- Filter_y$alpha + 1.96*sqrt(Filter_y$alphaVar)
+Filter_y$betaLower <- Filter_y$beta - 1.96*sqrt(Filter_y$betaVar)
+Filter_y$betaUpper <- Filter_y$beta + 1.96*sqrt(Filter_y$betaVar)
+
+ggplot(Filter_y, aes(x=1:120, y=alpha)) + geom_line(size=1, col="seagreen") + theme_classic() +
+  geom_line(data=Filter_y, aes(x=1:120, y=alphaLower), size=1, col="darkorange") +
+  geom_line(data=Filter_y, aes(x=1:120, y=alphaUpper), size=1, col="darkorange") 
+
+ggplot(Filter_y, aes(x=1:120, y=beta)) + geom_line(size=1, col="seagreen") + theme_classic()+
+  geom_line(data=Filter_y, aes(x=1:120, y=betaLower), size=1, col="darkorange") +
+  geom_line(data=Filter_y, aes(x=1:120, y=betaUpper), size=1, col="darkorange")
 
 
-Smooth <- dlmSmooth(y = as.matrix(CAPMv$IBM), dlmWithMLEs)
-SmoothS <- Smooth$s
-plot(Smooth$s[-1,1], type="l")
-plot(Smooth$s[-1,2], type="l")
+Smooth_2b <- dlmSmooth(y = as.matrix(CAPMv$IBM), dlmWithMLEs)
+Smooth_frame <- data.frame(alpha=Smooth_2b$s[-1,1], beta=Smooth_2b$s[-1,2])
+
+u1 <- matrix((t(data.frame(Smooth_2b$U.S)))[c(seq(1,242,2)),1])
+u2 <- matrix((t(data.frame(Smooth_2b$U.S)))[c(seq(2,242,2)),2])
+u_1 <-list()
+u_2 <- list()
+for(i in 1:120){
+  u_1[i]<-c(u1[i+1])
+  u_2[i]<-c(u2[i+1])
+}
+
+Smooth_frame$alphaVar <- unlist(dlmSvd2var(u = u_1, d = matrix(Smooth_2b$D.S[-1,1])))
+Smooth_frame$betaVar <- unlist(dlmSvd2var(u = u_2, d = matrix(Smooth_2b$D.S[-1,2])))
+# Intervals
+Smooth_frame$alphaLower <- Smooth_frame$alpha - 1.96*sqrt(Smooth_frame$alphaVar)
+Smooth_frame$alphaUpper <- Smooth_frame$alpha + 1.96*sqrt(Smooth_frame$alphaVar)
+Smooth_frame$betaLower <- Smooth_frame$beta - 1.96*sqrt(Smooth_frame$betaVar)
+Smooth_frame$betaUpper <- Smooth_frame$beta + 1.96*sqrt(Smooth_frame$betaVar)
+
+ggplot(Smooth_frame, aes(x=1:120, y=alpha)) + geom_line(size=1, col="seagreen") + theme_classic() +
+  geom_line(data=Smooth_frame, aes(x=1:120, y=alphaLower), size=1, col="darkorange") +
+  geom_line(data=Smooth_frame, aes(x=1:120, y=alphaUpper), size=1, col="darkorange") + ylim(0.0055,0.0078)
+
+ggplot(Smooth_frame, aes(x=1:120, y=beta)) + geom_line(size=1, col="seagreen")+theme_classic()+ylim(0.3,0.67)+
+  geom_line(data=Smooth_frame, aes(x=1:120, y=betaLower), size=1, col="darkorange", linetype="dashed") +
+  geom_line(data=Smooth_frame, aes(x=1:120, y=betaUpper), size=1, col="darkorange", linetype="dashed") 
+
+
 
 
 # c)
 TimeB <- data.frame(Beta=(dlmSmooth(y = as.matrix(CAPMv[2:49,1]), dlmWithMLEs)$s)[,2])
-TimeA <- data.frame(Beta=(dlmSmooth(y = as.matrix(CAPMv[51:121,1]), dlmWithMLEs)$s)[,2])
+TimeA <- data.frame(Beta=(dlmSmooth(y = as.matrix(CAPMv[2:121,1]), dlmWithMLEs)$s)[,2])
 
 Sensitivity<- data.frame(Beta=c(rnorm(10000, mean(TimeB$Beta), sd(TimeB$Beta)),
 rnorm(10000, mean(TimeA$Beta), sd(TimeA$Beta))), Period=rep(c("Before", "After"),
@@ -202,14 +253,12 @@ hist(Sensitivity[1:10000,1], xlim = c(-.1,.1), col="blue", main="Before 82")
 hist(Sensitivity[10001:20000,1], xlim = c(-.1,.1), col="red", main="After 82")
 
 
-ggplot(Sensitivity, aes(x=Beta, fill=Period)) + theme_classic() +
-  geom_histogram(binwidth=0.01) + xlim(-0.1,0.1)
-  scale_y_continuous(labels=percent)
+hist1 <- ggplot(Sensitivity[1:10000,], aes(x=Beta)) + theme_classic() +
+  geom_histogram(binwidth=0.01, fill="royalblue") +xlim(-0.22, .55) + labs(title="Before 82")
+hist2 <- ggplot(Sensitivity[10001:20000,], aes(x=Beta)) + theme_classic() +
+  geom_histogram(binwidth=0.02, fill="red3") + xlim(-0.22, .55) + labs(title="After 82")
 
-ggplot(Sensitivity[1:10000,], aes(x=Beta)) + theme_classic() +
-  geom_histogram(binwidth=0.01) 
-ggplot(Sensitivity[10001:20000,], aes(x=Beta)) + theme_classic() +
-  geom_histogram(binwidth=0.01) 
+grid.arrange(hist1, hist2, ncol=1)
 
 
 

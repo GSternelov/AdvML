@@ -1,12 +1,10 @@
 library(ggplot2)
-library(mvtnorm)
 library(dlm)
 library(gridExtra)
-
+library(mvtnorm)
 # Assignment 1
 
 # a) - Simulate the model
-
 ssm1 <- function(C=matrix(0), A=matrix(1), B=matrix(0), u=matrix(0), x0=0,
                  omegaE=0, omegaV=0, TimeS=0) {
   xt <- 0
@@ -28,14 +26,8 @@ ssm1 <- function(C=matrix(0), A=matrix(1), B=matrix(0), u=matrix(0), x0=0,
 set.seed(1234)
 resA <- ssm1(C = matrix(0.93), x0 = 0, omegaE = sqrt(0.5), omegaV = sqrt(0.1), TimeS = 100)
 plotA <- ggplot(resA, aes(x=t, y=Val, col=Value)) + geom_line(size=1) + theme_classic() + 
-  ylim(-4,4) + scale_color_manual(values=c("skyblue", "royalblue"))
-load(file ="Lab4/simulated_data.RDA")
-ggplot(simulated_data, aes(x=time, y=y)) + geom_line(col="royalblue") + theme_classic() + 
-  geom_line(data=simulated_data, aes(x=time, y=state), col="red3") + ylim(-4,4)
-
-
-# b) - Filtering: Sequential state inference
-
+  ylim(-4,4) + scale_color_manual(values=c("skyblue", "royalblue")) 
+plotA + labs(caption = "Figure 1")
 KalmanF <- function(yt, C=matrix(0), A=matrix(1),
                     B=matrix(0), u=matrix(0), omegaE=0, omegaV=0, TimeS=0){
   KalmanMat <- matrix(c(0,0), ncol=2, nrow=101)
@@ -52,17 +44,13 @@ KalmanF <- function(yt, C=matrix(0), A=matrix(1),
   return(KalmanFrame)
 }
 
-resB <- KalmanF(yt = resA[101:200,1], C = matrix(0.93), omegaE = 0.5, omegaV = 0.1, TimeS = 100)
-resB_1 <- data.frame(Val=c(resB[,1],resB[,1]+1.96*sqrt(resB[,2]),resB[,1]-1.96*sqrt(resB[,2])),
-                     Time=rep(1:100, 3), Value=rep(c("Kalman mean", "Upper", "Lower"), each=100))
-resB_1$Value <- factor(resB_1$Value, levels=rev(levels(resB_1$Value)))
-
+resB <- KalmanF(yt = resA[101:200,1], C = matrix(0.93), omegaE = 0.5, omegaV = 0.1, TimeS=100)
+resB_1 <- data.frame(Val=c(resB[,1],resB[,1]+1.96*sqrt(resB[,2]),resB[,1]-1.96*sqrt(resB[,2])), Time=rep(1:100, 3), Value=rep(c("Kalman mean", "Upper", "Lower"), each=100))
+                     
 plotA + geom_line(data=resB_1, aes(x=Time, y=Val, col=Value), size=1) +ylim(-5,4)+
   scale_colour_manual(values=c("red3", "darkorange","skyblue","royalblue","darkorange"))+
-  labs(x="Time", title="Kalman filter estimates with \n0.95 probability intervals")
-
-model <- dlm(m0=0, V=0.5, W=0.1, C0=10, FF=0.93, GG=1)
-filteringB <- dlmFilter(y=resA[101:200,1], model)
+  labs(x="Time", title="Kalman filter estimates with 0.95 probability intervals", caption="Figure 2")
+filteringB <- dlmFilter(y=resA[101:200,1], dlm(m0=0, V=0.5, W=0.1, C0=10, FF=0.93, GG=1) )
 
 filterB <- data.frame(y=(filteringB$m)[-1])
 filterVar <- unlist(dlmSvd2var(u = filteringB$U.C, d = filteringB$D.C))
@@ -71,15 +59,7 @@ filterB[101:300,1] <- c(filterB$y + 1.96*sqrt(filterVar[-1]),
 filterB$Time <- rep(1:100, 3)
 filterB$Value <- rep(c("dlm Kalman mean", "dlm Upper", "dlm Lower"), each=100)
 
-ggplot(resB_1, aes(x=Time, y=Val, col=Value,linetype=Value)) + geom_line(size=1) +
-  theme_classic()+ ylim(-5,4)+ 
-  geom_line(data=filterB, aes(x=Time, y=y, col=Value, linetype=Value),size=1) +
-  scale_colour_manual(values=c("purple","seagreen","seagreen","red3","darkorange","darkorange"))+
-  scale_linetype_manual(values=c("dashed","dashed","dashed","solid","solid","solid"))+
-  labs(title="Comparsion between dlmFilter and KalmanF function")
-  
-
-# c) - Prediction of state and data by simulation
+ggplot(resB_1, aes(x=Time, y=Val, col=Value,linetype=Value)) + geom_line(size=1) + theme_classic()+ ylim(-5,4)+ geom_line(data=filterB, aes(x=Time, y=y, col=Value, linetype=Value),size=1) +scale_colour_manual(values=c("purple","seagreen","seagreen","red3","darkorange","darkorange"))+scale_linetype_manual(values=c("dashed","dashed","dashed","solid","solid","solid"))+labs(title="Comparsion between dlmFilter and KalmanF function", caption="Figure 3")
 PredFunc <- function(C=matrix(0), A=matrix(1), B=matrix(0), u=matrix(0), x0=0,
                      omegaE=0, omegaV=0, TimeS=0){
   xt <- 0
@@ -115,34 +95,7 @@ ggplot(resA, aes(x=t, y=Val, col=Value)) + geom_line(size=1) + theme_classic() +
   geom_line(data=resB_1[101:200,], aes(x=Time, y=Val), col="darkorange", size=1) +
   geom_line(data=resB_1[201:300,], aes(x=Time, y=Val), col="darkorange", size=1) +
   geom_line(data=quanTsFrame, aes(x=Time, y=x, col=Interval), size=1, linetype="dashed") +
-  scale_color_manual(values=c("skyblue", "royalblue","darkmagenta","darkmagenta","red3", "red3"))+
-  labs(x="Time", title="0.95 probability intervals for k=5")
-
-#### DLM Forecast ####
-dlmFc <- dlmForecast(mod = model, nAhead = 5, sampleNew = 10000)
-newStates <- t(apply(data.frame(dlmFc$newStates), 1, quantile, probs=c(0.025, 0.975)))
-newObs <- t(apply(data.frame(dlmFc$newObs), 1, quantile, probs=c(0.025, 0.975)))
-
-quanTsFrame2 <- data.frame(x=c(newStates[,1],newStates[,2],c(newObs[,1],newObs[,2])),
-                           Time= 100+rep(1:5, 4),Var=rep(c("x", "y"),each=10),
-                           InterV=rep(c("Lower", "Upper"),2, each=5))
-quanTsFrame2$Interval <- interaction(quanTsFrame2$Var, quanTsFrame2$InterV)
-quanTsFrame2$Interval<- factor(quanTsFrame2$Interval, levels=rev(levels(quanTsFrame2$Interval)))
-
-ggplot(resA[1:100,], aes(y=Val, x=t)) + geom_line() + theme_classic() + ylim(-6.5,6.5) +
-  geom_line(data=resB_1[1:100,], aes(x=Time, y=Val), col="seagreen", size=1.1) +
-  geom_line(data=resB_1[101:200,], aes(x=Time, y=Val), col="darkorange", size=1) +
-  geom_line(data=resB_1[201:300,], aes(x=Time, y=Val), col="darkorange", size=1) +
-  geom_line(data=quanTsFrame2, aes(x=Time, y=x, col=Interval), size=1, linetype="dashed") +
-  scale_color_manual(values=c("royalblue","red3","royalblue", "red3"))+
-  labs(x="Time", title="0.95 probability intervals for k=5")
-
-#### ####
-
-# d) - State and model parameter inference
-
-## Implementing the FFBS algorithm
-# First: Kalman Filter, need to return muBar_t and sigmaBar_t as well
+  scale_color_manual(values=c("skyblue", "royalblue","darkmagenta","darkmagenta","red3", "red3"))+ labs(x="Time", title="0.95 probability intervals for k=5", caption="Figure 4")
 KalmanF_2 <- function(yt, C=matrix(0), A=matrix(1),
                     B=matrix(0), u=matrix(0), omegaE=0, omegaV=0, TimeS=0){
   KalmanMat <- matrix(c(0,0,0,0), ncol=4, nrow=101)
@@ -158,11 +111,6 @@ KalmanF_2 <- function(yt, C=matrix(0), A=matrix(1),
   KalmanFrame <- data.frame(KalmanMat[-1,], Time=1:TimeS)
   return(KalmanFrame)
 }
-KalmanRes <- KalmanF_2(yt = resA[101:200,1], C = matrix(0.93), omegaE = 0.5, omegaV = 0.1,
-                     TimeS = 100)
-colnames(KalmanRes) <- c("mu_t", "sigma_t", "muBar_t", "sigmaBar_t", "Time")
-# Needs mu_t, sigma_t, sigmaBar_t+1, muBar_t+1 and Xt+1 for h_t
-# Needs sigma_t, sigmaBar_t+1 for Ht
 
 BS <- function(A, Kalman, x){
   x_t <- data.frame(Val=0)
@@ -185,17 +133,15 @@ bayesReg <- function(beta0, Xt, y, omega0, cov0){
 }
 
 # Gibbs sampling
-y = resA[101:200, 1]
-x = resA[1:100, 1]
 set.seed(311015)
 theta <- data.frame(matrix(ncol=2, nrow=5000)) #nrow sets number of sims
 theta[1,2] <- 1  #start value for theta
 Xt= matrix(data = c(rep(1,100),resA[1:100,1]), ncol=2)
 for(j in 1:nrow(theta)){
-  #LGSS <- ssm1(C = matrix(theta[j,2]), x0 = 0, omegaE = sqrt(0.5), omegaV = sqrt(0.1),
-   #           TimeS = 100)
-  #y = LGSS[101:200, 1]
-  #x = LGSS[1:100, 1]
+  LGSS <- ssm1(C = matrix(theta[j,2]), x0 = 0, omegaE = sqrt(0.5), omegaV = sqrt(0.1),
+              TimeS = 100)
+  y = LGSS[101:200, 1]
+  x = LGSS[1:100, 1]
   KalmanRes <- KalmanF_2(yt = y, C = matrix(theta[j,2]), omegaE = 0.5, omegaV = 0.1,
                          TimeS = 100)
   NewX <- (BS(A = matrix(1), Kalman = KalmanRes, x=x))
@@ -204,10 +150,9 @@ for(j in 1:nrow(theta)){
   coefs <- bayesReg(beta0 = matrix(data=c(0,0), ncol=1),Xt=Xt, y=y, omega0=0.5,cov0=100)
   theta[j+1,] <- colMeans(coefs) 
 }
-ggplot(theta, aes(y=X2, x=1:nrow(theta))) + geom_line() + theme_classic()
-ggplot(theta, aes(x=X2)) + geom_density() +  theme_classic() +
-  geom_vline(xintercept = c(mean(theta$X2),0.93), col=c("red","blue")) 
-
+ggplot(theta, aes(y=X2, x=1:nrow(theta))) + geom_line() + theme_classic() + labs(caption="Figure 5", title="Trace plot", x="1:1000")
+ggplot(theta, aes(x=X2)) + geom_histogram(binwidth = 0.1) + labs(caption="Figure 6", title=expression(Posterior~distribution~of~theta)) +  theme_classic()
+mean(theta$X2)
 # Assignment 2
 load("C:\\Users\\Gustav\\Documents\\AdvML\\Lab4\\CAPM.Rda")
 
@@ -235,11 +180,10 @@ initVal <- c(1,1,1) # Initial values for optim on the estimated parameters
 MLEs <- dlmMLE(Yt, parm = initVal, build = buildLocalTrend, data = Zt)
 dlmWithMLEs <- buildLocalTrend(MLEs$par, data = Zt)
 
-# b) - Filtering and smoothing
 ## Filtering ##
 Filter_2b <- dlmFilter(y = Yt, dlmWithMLEs)
 
-# Variances, which value is of interest for which variable??
+# Variances
 u1 <- matrix((t(data.frame(Filter_2b$U.C)))[c(seq(1,242,2)),1])
 u2 <- matrix((t(data.frame(Filter_2b$U.C)))[c(seq(2,242,2)),2])
 u_1 <-list()
@@ -257,13 +201,13 @@ Filter_y$alphaUpper <- Filter_y$alpha + 1.96*sqrt(Filter_y$alphaVar)
 Filter_y$betaLower <- Filter_y$beta - 1.96*sqrt(Filter_y$betaVar)
 Filter_y$betaUpper <- Filter_y$beta + 1.96*sqrt(Filter_y$betaVar)
 
-alphaFilter <- ggplot(Filter_y, aes(x=1:120, y=alpha)) + geom_line(size=1, col="seagreen") + theme_classic() +
-  geom_line(data=Filter_y, aes(x=1:120, y=alphaLower), size=1, col="darkorange") +
-  geom_line(data=Filter_y, aes(x=1:120, y=alphaUpper), size=1, col="darkorange") 
+alphaFilter <- ggplot(Filter_y, aes(x=1:120, y=alpha)) + geom_line(col="seagreen", size=1) + theme_classic() + labs(title="Alpha filtered", caption="Figure 7") +
+  geom_line(data=Filter_y, aes(x=1:120, y=alphaLower), col="darkorange", size=1) +
+  geom_line(data=Filter_y, aes(x=1:120, y=alphaUpper), col="darkorange", size=1) 
 
-betaFilter <- ggplot(Filter_y, aes(x=1:120, y=beta)) + geom_line(size=1, col="seagreen") + theme_classic()+
-  geom_line(data=Filter_y, aes(x=1:120, y=betaLower), size=1, col="darkorange") +
-  geom_line(data=Filter_y, aes(x=1:120, y=betaUpper), size=1, col="darkorange")
+betaFilter <- ggplot(Filter_y, aes(x=1:120, y=beta)) + geom_line( col="seagreen", size=1) + theme_classic()+ labs(title="Beta filtered", caption="Figure 9") +
+  geom_line(data=Filter_y, aes(x=1:120, y=betaLower), col="darkorange", size=1) +
+  geom_line(data=Filter_y, aes(x=1:120, y=betaUpper), col="darkorange", size=1)
 
 #### Smoothed ####
 Smooth_2b <- dlmSmooth(y = Yt, dlmWithMLEs)
@@ -280,29 +224,25 @@ Smooth_frame$alphaUpper <- Smooth_frame$alpha + 1.96*Smooth_frame$alphaSd
 Smooth_frame$betaLower <- Smooth_frame$beta - 1.96*Smooth_frame$betaSd
 Smooth_frame$betaUpper <- Smooth_frame$beta + 1.96*Smooth_frame$betaSd
 
-alphaSmooth <- ggplot(Smooth_frame, aes(x=1:120, y=alpha)) + geom_line(size=1, col="seagreen") + theme_classic() +
+alphaSmooth <- ggplot(Smooth_frame, aes(x=1:120, y=alpha)) + geom_line(size=1, col="seagreen") + theme_classic() +labs(title="Alpha smoothed", caption="Figure 8") +
   geom_line(data=Smooth_frame, aes(x=1:120, y=alphaLower), size=1, col="darkorange") +
   geom_line(data=Smooth_frame, aes(x=1:120, y=alphaUpper), size=1, col="darkorange") 
 
-betaSmooth <- ggplot(Smooth_frame, aes(x=1:120, y=beta)) + geom_line(size=1, col="seagreen")+theme_classic()+
+betaSmooth <- ggplot(Smooth_frame, aes(x=1:120, y=beta)) + geom_line(size=1, col="seagreen")+theme_classic()+labs(title="Beta smoothed", caption="Figure 10") +
   geom_line(data=Smooth_frame, aes(x=1:120, y=betaLower),size=1 ,col="darkorange") +
   geom_line(data=Smooth_frame, aes(x=1:120, y=betaUpper),size=1, col="darkorange") 
 
-grid.arrange(alphaFilter, alphaSmooth)
-grid.arrange(betaFilter, betaSmooth)
-
-
+grid.arrange(alphaFilter, alphaSmooth, ncol=2)
+grid.arrange(betaFilter, betaSmooth, ncol=2)
 # c)
+TimeB <- data.frame(Beta=(dlmSmooth(y = Yt[1:48], dlmWithMLEs)$s)[,2])
+TimeA <- data.frame(Beta=(dlmSmooth(y = Yt[1:120], dlmWithMLEs)$s)[,2])
 
-filter_1 <- dlmFilter(Yt[1:48], buildLocalTrend(MLEs$par, Zt[1:48]))
-filter_2 <- dlmFilter(Yt[49:120], buildLocalTrend(MLEs$par, Zt[49:120]))
+Sensitivity<- data.frame(Beta=c(rnorm(10000, mean(TimeB$Beta), sd(TimeB$Beta)),
+rnorm(10000, mean(TimeA$Beta), sd(TimeA$Beta))), Period=rep(c("Before 82", "After 82"),
+                                                            each=10000))
+Sensitivity$Period <- factor(Sensitivity$Period, levels=rev(levels(Sensitivity$Period)))
 
-set.seed(311015)
-mean_1 <- mean(dlmBSample(filter_1)[,2])
-mean_2 <- mean(dlmBSample(filter_2)[,2])
-
-cat("Mean before 82:", mean_1)
-cat("Mean after 82:", mean_2)
-
-
-
+ggplot(Sensitivity, aes(x=Beta))+geom_density(aes(y=..density..,fill=Period),alpha=.7)+
+  scale_fill_manual(values = c("seagreen", "darkorange"))+theme_classic() + labs(caption="Figure 11")
+## NA
